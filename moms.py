@@ -1,52 +1,31 @@
 import streamlit as st
 import pandas as pd
-import clipboard
 import re
+from docx import Document
+import base64
+import os
 
-def generate_email(template, row, colors):
+def generate_email(template, row):
     email = template
-    for index, column in enumerate(row.index):
-        colored_value = f'<span style="color:{colors[index % len(colors)]}">{str(row[column])}</span>'
-        email = re.sub(f'\\[{re.escape(column)}\\]', colored_value, email)
+    for column in row.index:
+        email = re.sub(f'\\[{re.escape(column)}\\]', str(row[column]), email)
     return email
 
-def copy_to_clipboard(text):
-    clipboard.copy(text)
-    st.write("Email copied to clipboard!")
+def save_as_docx(text, filename):
+    doc = Document()
+    doc.add_paragraph(text)
+    doc.save(filename)
+
+def create_download_link(filename):
+    with open(filename, 'rb') as file:
+        file_data = file.read()
+    b64 = base64.b64encode(file_data).decode()
+    return f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">Download {filename}</a>'
 
 def main():
     st.set_page_config(page_title="SANTOSO", layout="wide")
 
     st.title("PROGRAM RAHASIA IBU SANTOSO")
-
-    # Custom CSS styles
-    custom_css = """
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            color: #333;
-            background-color: #f9f9f9;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            color: #333;
-        }
-        .stButton>button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            font-size: 14px;
-            padding: 8px 16px;
-            cursor: pointer;
-            text-align: center;
-            border-radius: 4px;
-        }
-        .stButton>button:hover {
-            background-color: #45a049;
-        }
-    </style>
-    """
-
-    st.markdown(custom_css, unsafe_allow_html=True)
 
     # Create columns for layout
     left_column, right_column = st.columns([1, 1])
@@ -71,17 +50,20 @@ def main():
 
         if uploaded_file is not None and user_text:
             emails = []
-            colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'magenta', 'cyan']
             for _, row in df.iterrows():
-                email = generate_email(user_text, row, colors)
+                email = generate_email(user_text, row)
                 emails.append(email)
 
             for i, email in enumerate(emails, start=1):
                 st.write(f"Email {i}:")
-                st.write(email, unsafe_allow_html=True)
-                copy_button = st.button(f"Copy Email {i}")
-                if copy_button:
-                    copy_to_clipboard(email)
+                st.write(email)
+
+                filename = f"email_{i}.docx"
+                save_as_docx(email, filename)
+                st.markdown(create_download_link(filename), unsafe_allow_html=True)
+
+                os.remove(filename)  # remove the saved file after creating download link
+
                 st.write("------")
 
 if __name__ == "__main__":
